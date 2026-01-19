@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <title>UD5 - Segnaletica in Ufficio</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+        body { background: #e3f2fd; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
+        .container { width: 800px; height: 550px; background: #fff; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.2); overflow: hidden; display: flex; flex-direction: column; }
+        .header { background: #1976d2; color: #fff; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+        .header h1 { font-size: 18px; }
+        .btn { background: #ffc107; color: #1976d2; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .btn:hover { background: #ffb300; }
+        .content { flex: 1; padding: 10px 16px; display: flex; flex-direction: column; gap: 8px; }
+
+        .game-area { display: flex; gap: 10px; flex: 1; }
+        .office-wrapper { position: relative; flex: 2; overflow: hidden; border-radius: 10px; }
+        .office-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+    background: #000;  /* eventuali bande laterali/ sopra sotto */
+}
+
+        /* 3 placeholder sull’immagine ufficio */
+        .dropzone {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border: 2px dashed rgba(255,255,255,0.9);
+            border-radius: 8px;
+            box-shadow: 0 0 0 2px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-size: 11px;
+            text-align: center;
+            background: rgb(0, 0, 0);
+        }
+        /* Regola qui le posizioni in % finché coincidono coi placeholder dell’immagine */
+       /* Estintore: rettangolo stretto e alto sulla colonna di sinistra */
+.dz-estintore {
+    position: absolute;
+    left: 15%;    /* sposta a destra/sinistra */
+    top: 18%;    /* sposta su/giù */
+    width: 7%;   /* larghezza relativa all’immagine */
+    height: 7%; /* altezza relativa al placeholder verticale */
+}
+
+/* Emergency exit: rettangolo largo e basso sopra la porta */
+.dz-exit {
+    position: absolute;
+    left: 28%;
+    top: 23%;
+    width: 18%;
+    height: 6%;
+}
+
+/* Wet floor: rettangolo quasi quadrato sul cavalletto giallo */
+.dz-wetfloor {
+    position: absolute;
+    left: 45%;
+    top: 55%;
+    width: 12%;
+    height: 20%;
+}
+        .dropzone.correct { border-color: #4caf50; background: rgba(76,175,80,0.4); }
+        .dropzone.incorrect { border-color: #f44336; background: rgba(244,67,54,0.4); }
+
+        .panel { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .panel h2 { font-size: 16px; color: #1976d2; }
+        .signs { display: flex; flex-wrap: wrap; gap: 8px; }
+        .sign {
+            width: 90px;
+            height: 90px;
+            border-radius: 8px;
+            border: 2px solid #ddd;
+            overflow: hidden;
+            cursor: grab;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .sign img { max-width: 100%; max-height: 100%; object-fit: contain; }
+        .sign.dragging { opacity: 0.6; border-color: #1976d2; }
+
+        .score { font-weight: bold; color: #1976d2; }
+        .feedback { font-size: 13px; line-height: 1.6; }
+
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>UD5 - Segnaletica in Ufficio</h1>
+        <div>
+            <button class="btn" onclick="restart()">Ricomincia</button>
+            <button class="btn" onclick="window.close()">Torna al corso</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="score" id="score">Cartelli posizionati correttamente: 0/3</div>
+        <div class="game-area">
+            <!-- Immagine ufficio con 3 dropzone -->
+            <div class="office-wrapper" id="office">
+                <img src="images/ufficio.png" alt="Ufficio in pulizia">
+                <div class="dropzone dz-estintore" data-zone="estintore"></div>
+                <div class="dropzone dz-exit" data-zone="exit"></div>
+                <div class="dropzone dz-wetfloor" data-zone="wetfloor"></div>
+            </div>
+
+            <!-- Pannello cartelli -->
+            <div class="panel">
+                <h2>Trascina i cartelli giusti</h2>
+                <div class="signs" id="signs">
+                    <div class="sign" draggable="true" data-id="estintore">
+                        <img src="images/cartello estintore.png" alt="Cartello estintore">
+                    </div>
+                    <div class="sign" draggable="true" data-id="exit">
+                        <img src="images/emergency exit.jpg" alt="Cartello uscita di emergenza">
+                    </div>
+                    <div class="sign" draggable="true" data-id="wetfloor">
+                        <img src="images/caution wetfloor.png" alt="Cartello pavimento bagnato">
+                    </div>
+                </div>
+                <div class="feedback" id="feedback">
+                    Trascina ciascun cartello sulla posizione corretta nell’immagine.
+                </div>
+                <button class="btn" id="checkBtn" onclick="checkResult()" disabled>Verifica</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let draggedId = null;
+    let correctPlaced = 0;
+
+    const scoreEl = document.getElementById('score');
+    const feedbackEl = document.getElementById('feedback');
+    const checkBtn = document.getElementById('checkBtn');
+
+    // Drag start sui cartelli
+    document.querySelectorAll('.sign').forEach(sign => {
+        sign.addEventListener('dragstart', e => {
+            draggedId = sign.dataset.id;
+            sign.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', draggedId);
+        });
+        sign.addEventListener('dragend', () => {
+            sign.classList.remove('dragging');
+        });
+    });
+
+document.querySelectorAll('.dropzone').forEach(dz => {
+    dz.addEventListener('dragover', e => e.preventDefault());
+    dz.addEventListener('drop', e => {
+        e.preventDefault();
+        if (!draggedId) return;
+
+        const expected = dz.dataset.zone;
+        const signEl = document.querySelector(`.sign[data-id="${draggedId}"]`);
+
+        if (expected === draggedId && !dz.classList.contains('correct') && signEl) {
+            dz.classList.remove('incorrect');
+            dz.classList.add('correct');
+
+            // 1) svuota eventuale testo nella dropzone
+            dz.innerHTML = '';
+
+            // 2) clona l'immagine del cartello e la inserisce nella dropzone
+            const img = signEl.querySelector('img').cloneNode(true);
+            img.style.maxWidth = '100%';
+            img.style.maxHeight = '100%';
+            dz.appendChild(img);
+
+            // 3) nasconde il cartello originale nel pannello
+            signEl.style.display = 'none';
+
+            // 4) aggiorna punteggio e feedback
+            correctPlaced++;
+            scoreEl.textContent = `Cartelli posizionati correttamente: ${correctPlaced}/3`;
+            feedbackEl.textContent = 'Bene! Continua a posizionare gli altri cartelli.';
+            if (correctPlaced === 3) checkBtn.disabled = false;
+        } else {
+            dz.classList.add('incorrect');
+            feedbackEl.textContent = 'Quella posizione non è corretta per questo cartello.';
+            setTimeout(() => dz.classList.remove('incorrect'), 800);
+        }
+        draggedId = null;
+    });
+});
+
+    function checkResult() {
+        if (correctPlaced === 3) {
+            feedbackEl.innerHTML =
+                'Ottimo! Hai posizionato correttamente:<br>' +
+                '- Il cartello estintore vicino all’estintore (segnaletica antincendio).<br>' +
+                '- Il cartello di uscita di emergenza sopra la porta di esodo.<br>' +
+                '- Il cartello di pavimento bagnato nella zona di lavaggio.';
+        }
+    }
+
+   function restart() {
+    draggedId = null;
+    correctPlaced = 0;
+
+    // reset testo punteggio e feedback
+    scoreEl.textContent = 'Cartelli posizionati correttamente: 0/3';
+    feedbackEl.textContent = 'Trascina ciascun cartello sulla posizione corretta nell’immagine.';
+    checkBtn.disabled = true;
+
+    // 1) ripristina cartelli nel pannello
+    document.querySelectorAll('.sign').forEach(sign => {
+        sign.style.display = 'flex'; // o 'block' in base al tuo CSS
+    });
+
+    // 2) ripulisce dropzone: rimuove immagini clonate + classi
+    document.querySelectorAll('.dropzone').forEach(dz => {
+        dz.classList.remove('correct', 'incorrect', 'occupied');
+        dz.innerHTML = '';            // svuota l’interno
+       
+    });
+}
+</script>
+</body>
+</html>
